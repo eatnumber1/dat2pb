@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package dat2pb;
+
+message RomDat {
+  message Header {
+    string name = 1;
+    string description = 2;
+    string version = 3;
+    string date = 4;
+    string author = 5;
+    string homepage = 6;
+    string url = 7;
+  }
+
+  message Game {
+    message Rom {
+      string name = 1;
+      uint64 size = 2;
+      string crc = 3;
+      string md5 = 4;
+      string sha1 = 5;
+    }
+
+    string name = 1;
+    string category = 2;
+    string serial = 3;
+    string description = 4;
+    repeated Rom rom = 5;
+  }
+
+  Header header = 1;
+  repeated Game game = 2;
+}

@@ -1,0 +1,3 @@
+build --cxxopt=-std=c++17 --cxxopt=-fno-exceptions
+test --cxxopt=-std=c++17 --cxxopt=-fno-exceptions
+run --cxxopt=-std=c++17 --cxxopt=-fno-exceptions
