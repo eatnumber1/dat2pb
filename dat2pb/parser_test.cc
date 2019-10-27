@@ -98,7 +98,8 @@ INSTANTIATE_TEST_SUITE_P(
     DatEqualsProtoFilesTest,
     testing::Values(
         DatProtoFiles{"nointro_supergrafx.dat", "nointro_supergrafx.textproto"},
-        DatProtoFiles{"redump_pce_cd.dat", "redump_pce_cd.textproto"}
+        DatProtoFiles{"redump_pce_cd.dat", "redump_pce_cd.textproto"},
+        DatProtoFiles{"redump_ps2.dat", "redump_ps2.textproto"}
     ));
 
 }  // namespace

@@ -4,6 +4,7 @@
 #include <string_view>
 #include <utility>
 #include <cstdint>
+#include <cstdlib>
 
 #include "absl/strings/ascii.h"
 #include "absl/strings/numbers.h"
@@ -19,6 +20,7 @@ using ::rhutil::OkStatus;
 using ::rhutil::InvalidArgumentError;
 using ::rhutil::InvalidArgumentErrorBuilder;
 using ::rhutil::UnknownError;
+using ::rhutil::UnknownErrorBuilder;
 
 namespace {
 
@@ -43,14 +45,6 @@ class XMLString : public std::unique_ptr<char, XMLFreeDeleter<char>> {
    explicit XMLString(xmlChar *s) : std::unique_ptr<char, XMLFreeDeleter<char>>(reinterpret_cast<char*>(s)) {}
 };
 
-void InitXML() {
-  static bool initialized = []() {
-    xmlInitParser();
-    return true;
-  }();
-  (void)initialized;
-}
-
 class XMLStringView : public std::string_view {
  public:
   using std::string_view::string_view;
@@ -63,14 +57,58 @@ const xmlChar *operator ""_xml(const char *s, std::size_t len) {
   return reinterpret_cast<const xmlChar *>(s);
 }
 
-Status LastXMLErrorStatus() {
-  xmlError *err = xmlGetLastError();
-  if (!err) return OkStatus();
+class XMLErrorCollector {
+ public:
+  static XMLErrorCollector *Instance() {
+    static XMLErrorCollector *collector = []() {
+      return new XMLErrorCollector();
+    }();
+    return collector;
+  }
 
-  // Formatting based on http://www.xmlsoft.org/html/libxml-xmlerror.html#xmlError
-  return UnknownError(
-      absl::StrFormat("%d:%d: %s (err %d:%d)", err->line,
-                      err->int2, err->message, err->domain, err->code));
+  Status LastError() {
+    return last_error_;
+  }
+
+ private:
+  friend void InitXML();
+
+  XMLErrorCollector() = default;
+
+  void HandleError(xmlError *error) {
+    // Ignore unresolved entity warnings.
+    if (error->domain == XML_FROM_PARSER &&
+        error->code == XML_WAR_UNDECLARED_ENTITY) {
+      return;
+    }
+
+    auto b = UnknownErrorBuilder();
+    b << "Error at " << error->line << ":" << error->int2
+      << ": " << absl::StripAsciiWhitespace(error->message) << " "
+      << absl::StrFormat("(err %d:%d)", error->domain, error->code);
+    last_error_ = std::move(b);
+  }
+
+  static void HandleError(void *ctx, xmlError *error) {
+    reinterpret_cast<XMLErrorCollector*>(ctx)->HandleError(error);
+  }
+
+  static thread_local Status last_error_;
+};
+thread_local Status XMLErrorCollector::last_error_;
+
+void InitXML() {
+  static bool initialized = []() {
+    xmlInitParser();
+    xmlSetStructuredErrorFunc(XMLErrorCollector::Instance(),
+                              &XMLErrorCollector::HandleError);
+    return true;
+  }();
+  (void)initialized;
+}
+
+Status LastXMLErrorStatus() {
+  return XMLErrorCollector::Instance()->LastError();
 }
 
 Status ParseHeader(xmlDoc *doc, const xmlNode &node, RomDat::Header *header) {
@@ -142,6 +180,10 @@ Status ParseGame(xmlDoc *doc, const xmlNode &node, RomDat::Game *game) {
       XMLString serial(xmlNodeListGetString(doc, child->xmlChildrenNode,
                                             /*inLine=*/true));
       game->set_serial(serial.get());
+    } else if (name == "version") {
+      XMLString version(xmlNodeListGetString(doc, child->xmlChildrenNode,
+                                                 /*inLine=*/true));
+      game->set_version(version.get());
     } else if (name == "description") {
       XMLString description(xmlNodeListGetString(doc, child->xmlChildrenNode,
                                                  /*inLine=*/true));
@@ -174,8 +216,11 @@ StatusOr<RomDat> ParseRomDat(std::istream *input) {
   std::unique_ptr<xmlDoc, XMLDocDeleter> doc{
     xmlReadIO(
       xml_read, xml_close, input, "noname.xml", /*encoding=*/nullptr,
-      /*options=*/XML_PARSE_NONET | XML_PARSE_COMPACT | XML_PARSE_NOBLANKS)};
+      /*options=*/(XML_PARSE_NONET | XML_PARSE_COMPACT | XML_PARSE_NOBLANKS |
+                   XML_PARSE_NOENT | XML_PARSE_NOCDATA))};
   RETURN_IF_ERROR(LastXMLErrorStatus());
+
+  // TODO(eatnumber1): Suppress warnings about undefined entities.
 
   xmlNode *node = xmlDocGetRootElement(doc.get());
   RETURN_IF_ERROR(LastXMLErrorStatus());

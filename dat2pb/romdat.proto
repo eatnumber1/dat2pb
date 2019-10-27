@@ -26,7 +26,8 @@ message RomDat {
     string category = 2;
     string serial = 3;
     string description = 4;
-    repeated Rom rom = 5;
+    string version = 5;
+    repeated Rom rom = 6;
   }
 
   Header header = 1;
