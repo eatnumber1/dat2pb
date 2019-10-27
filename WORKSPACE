@@ -33,9 +33,11 @@ git_repository(
   shallow_since = "1565193450 -0400",
 )
 
-local_repository(
+git_repository(
     name = "rhutil",
-    path = "third_party/rhutil",
+    remote = "https://github.com/eatnumber1/rhutil.git",
+    commit = "51a3e7ce251e83c3c8b3d0d610c4ff71d46e3e70",
+    shallow_since = "1572160388 -0700"
 )
 
 git_repository(

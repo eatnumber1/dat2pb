@@ -1,3 +1,0 @@
-[submodule "third_party/rhutil"]
-	path = third_party/rhutil
-	url = https://github.com/eatnumber1/rhutil.git
