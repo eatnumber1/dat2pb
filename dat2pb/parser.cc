@@ -76,12 +76,6 @@ class XMLErrorCollector {
   XMLErrorCollector() = default;
 
   void HandleError(xmlError *error) {
-    // Ignore unresolved entity warnings.
-    if (error->domain == XML_FROM_PARSER &&
-        error->code == XML_WAR_UNDECLARED_ENTITY) {
-      return;
-    }
-
     auto b = UnknownErrorBuilder();
     b << "Error at " << error->line << ":" << error->int2
       << ": " << absl::StripAsciiWhitespace(error->message) << " "
